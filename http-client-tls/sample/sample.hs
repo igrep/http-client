@@ -31,15 +31,11 @@ httpMain = do
     void $ httpLbs req man
 
 
--- TLSにした結果、またしても書き込みをする前にGCされてcloseしてしまっているように見える。
--- おそらく、TLSでの接続については `convertConnection` で行っているとおり、
--- `Network.Connection.Connection` をラップした `Network.HTTP.Client.Connection` になっているためと思われる。
--- どうやって回避するべきものか。。。
 wsMain :: IO ()
 wsMain = do
   manager <- newManager tlsManagerSettings
   req <- Http.mSetProxy manager <$> parseRequest "GET https://echo.websocket.org/"
-  withWsStremFromHttpConnection (managedResource <$> Http.getConn req manager) $ \stream ->
+  withWsStremFromHttpConnection req manager $ \stream ->
     WS.runClientWithStream stream "echo.websocket.org" "/" WS.defaultConnectionOptions [] app
 
 
@@ -61,14 +57,14 @@ app conn = do
   WS.sendClose conn ("Bye!" :: Text)
 
 
-withWsStremFromHttpConnection :: (IO Http.Connection) -> (WS.Stream -> IO a) -> IO a
-withWsStremFromHttpConnection getHttpConn action =
+withWsStremFromHttpConnection :: Http.Request -> Http.Manager -> (WS.Stream -> IO a) -> IO a
+withWsStremFromHttpConnection req manager action = do
+  mHttpConn <- Http.getConn req manager
   bracket
     ( do
-      httpConn <- getHttpConn
       let read = do
             traceM $ "Stream: BEGAN reading"
-            bs <- Http.connectionRead httpConn
+            bs <- Http.connectionRead $ managedResource mHttpConn
             traceM $ "Stream: FINISHED reading " ++ show bs
             return $
               if BS.null bs
@@ -77,8 +73,8 @@ withWsStremFromHttpConnection getHttpConn action =
 
           write =
             maybe
-              (Http.connectionClose httpConn)
-              (Http.connectionWrite httpConn . traceId "Stream: BEGAN writing" . BSL.toStrict)
+              (Http.connectionClose $ managedResource mHttpConn)
+              (Http.connectionWrite (managedResource mHttpConn) . traceId "Stream: BEGAN writing" . BSL.toStrict)
       WS.makeStream read write 
     )
     (WS.close)
