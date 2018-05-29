@@ -24,6 +24,8 @@ import qualified Data.ByteString as S
 import Data.Word (Word8)
 import Data.Function (fix)
 
+import Debug.Trace hiding (traceId)
+
 connectionReadLine :: Connection -> IO ByteString
 connectionReadLine conn = do
     bs <- connectionRead conn
@@ -127,9 +129,9 @@ socketConnection :: Socket
                  -> Int -- ^ chunk size
                  -> IO Connection
 socketConnection socket chunksize = makeConnection
-    (recv socket chunksize)
-    (sendAll socket)
-    (NS.close socket)
+    (traceM "Connection: BEGAN reading" *> (traceId "Connection: FINISHED reading" <$> recv socket chunksize))
+    (sendAll socket . traceId "Connection: BEGAN writing")
+    (NS.close $ traceStack "Connection: BEGAN closing" socket)
 
 openSocketConnection :: (Socket -> IO ())
                      -> Maybe HostAddress
@@ -163,7 +165,8 @@ openSocketConnectionSize tweakSocket chunksize hostAddress' host' port' = do
                  , NS.addrCanonName = Nothing
                  }]
 
-    firstSuccessful addrs $ \addr ->
+    firstSuccessful addrs $ \addr -> do
+        print addr
         E.bracketOnError
             (NS.socket (NS.addrFamily addr) (NS.addrSocketType addr)
                        (NS.addrProtocol addr))
@@ -181,3 +184,9 @@ firstSuccessful (a:as) cb =
         case as of
             [] -> E.throwIO e
             _  -> firstSuccessful as cb
+
+traceIdVia :: Show b => (a -> b) -> String -> a -> a
+traceIdVia via prefix x = trace (prefix ++ ": " ++ show (via x)) x
+
+traceId :: Show a => String -> a -> a
+traceId = traceIdVia id

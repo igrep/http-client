@@ -56,3 +56,16 @@ benchmark benchmark
                      , gauge
                      , http-client
                      , http-client-tls
+
+executable ws-sample
+  main-is:             sample.hs
+  hs-source-dirs:      sample
+  default-language:    Haskell2010
+  ghc-options:         -threaded
+  build-depends:       base
+                     , http-client
+                     , http-client-tls
+                     , bytestring
+                     , network
+                     , text
+                     , websockets

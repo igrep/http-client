@@ -3,6 +3,7 @@
 module Network.HTTP.Client.Response
     ( getRedirectedRequest
     , getResponse
+    , getConnection
     , lbsResponse
     ) where
 
@@ -78,6 +79,9 @@ lbsResponse res = do
     return res
         { responseBody = L.fromChunks bss
         }
+
+getConnection :: Managed Connection -> Connection
+getConnection = managedResource
 
 getResponse :: Maybe Int
             -> Request

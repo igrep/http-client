@@ -36,6 +36,10 @@ import Network.HTTP.Proxy
 import Data.KeyedPool
 import Data.Maybe (isJust)
 
+import           System.Environment (lookupEnv)
+
+import           Debug.Trace
+
 -- | A value for the @managerRawConnection@ setting, but also allows you to
 -- modify the underlying @Socket@ to set additional settings. For a motivating
 -- use case, see: <https://github.com/snoyberg/http-client/issues/71>.
@@ -232,7 +236,7 @@ mkCreateConnection ms = do
     tlsConnection <- managerTlsConnection ms
     tlsProxyConnection <- managerTlsProxyConnection ms
 
-    return $ \ck -> wrapConnectExc $ case ck of
+    return $ \ck -> wrapConnectExc $ case traceShowId ck of
         CKRaw connaddr connhost connport ->
             rawConnection connaddr (S8.unpack connhost) connport
         CKSecure connaddr connhost connport ->

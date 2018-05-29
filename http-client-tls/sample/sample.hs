@@ -26,9 +26,9 @@ main = wsMain
 
 httpMain :: IO ()
 httpMain = do
-    man <- newManager defaultManagerSettings
-    let req = "http://httpbin.org"
-    void $ httpLbs req man
+  man <- newManager defaultManagerSettings
+  let req = "http://httpbin.org"
+  void $ httpLbs req man
 
 
 wsMain :: IO ()
@@ -57,6 +57,8 @@ app conn = do
   WS.sendClose conn ("Bye!" :: Text)
 
 
+-- Managed に囲われた状態の Connection を直接扱う APIを提供する？
+-- withProxiedConnection
 withWsStremFromHttpConnection :: Http.Request -> Http.Manager -> (WS.Stream -> IO a) -> IO a
 withWsStremFromHttpConnection req manager action = do
   mHttpConn <- Http.getConn req manager
@@ -75,9 +77,11 @@ withWsStremFromHttpConnection req manager action = do
             maybe
               (Http.connectionClose $ managedResource mHttpConn)
               (Http.connectionWrite (managedResource mHttpConn) . traceId "Stream: BEGAN writing" . BSL.toStrict)
-      WS.makeStream read write 
+      WS.makeStream read write
     )
-    (WS.close)
+    ( \stream ->
+      WS.close stream `catch` ((\_ -> return ()) :: SomeException -> IO ())
+    )
     action
 
 traceIdVia :: Show b => (a -> b) -> String -> a -> a
