@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import           Control.Concurrent  (forkIO)
+import           Control.Concurrent  (forkIO, killThread)
 import           Control.Exception
 import           Control.Monad (forever, unless, void)
 import qualified Data.ByteString as BS
@@ -34,7 +34,7 @@ httpMain = do
 wsMain :: IO ()
 wsMain = do
   manager <- newManager tlsManagerSettings
-  req <- Http.mSetProxy manager <$> parseRequest "GET https://echo.websocket.org/"
+  req <- parseRequest "GET https://echo.websocket.org/"
   withWsStremFromHttpConnection req manager $ \stream ->
     WS.runClientWithStream stream "echo.websocket.org" "/" WS.defaultConnectionOptions [] app
 
@@ -44,7 +44,7 @@ app conn = do
   putStrLn "Connected!"
 
   -- Fork a thread that writes WS data to stdout
-  _ <- forkIO $ forever $ do
+  tid <- forkIO $ forever $ do
     msg <- WS.receiveData conn
     T.putStrLn msg
 
@@ -55,18 +55,19 @@ app conn = do
 
   loop
   WS.sendClose conn ("Bye!" :: Text)
+  killThread tid
 
 
 -- Managed に囲われた状態の Connection を直接扱う APIを提供する？
 -- withProxiedConnection
 withWsStremFromHttpConnection :: Http.Request -> Http.Manager -> (WS.Stream -> IO a) -> IO a
-withWsStremFromHttpConnection req manager action = do
-  mHttpConn <- Http.getConn req manager
+withWsStremFromHttpConnection req manager action =
+  Http.withProxiedConnection req manager $ \mconn -> do
   bracket
     ( do
       let read = do
             traceM $ "Stream: BEGAN reading"
-            bs <- Http.connectionRead $ managedResource mHttpConn
+            bs <- Http.connectionRead $ managedResource mconn
             traceM $ "Stream: FINISHED reading " ++ show bs
             return $
               if BS.null bs
@@ -75,13 +76,11 @@ withWsStremFromHttpConnection req manager action = do
 
           write =
             maybe
-              (Http.connectionClose $ managedResource mHttpConn)
-              (Http.connectionWrite (managedResource mHttpConn) . traceId "Stream: BEGAN writing" . BSL.toStrict)
+              (Http.connectionClose $ managedResource mconn)
+              (Http.connectionWrite (managedResource mconn) . traceId "Stream: BEGAN writing" . BSL.toStrict)
       WS.makeStream read write
     )
-    ( \stream ->
-      WS.close stream `catch` ((\_ -> return ()) :: SomeException -> IO ())
-    )
+    WS.close
     action
 
 traceIdVia :: Show b => (a -> b) -> String -> a -> a

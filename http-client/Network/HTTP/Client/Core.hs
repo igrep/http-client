@@ -11,7 +11,7 @@ module Network.HTTP.Client.Core
     , responseClose
     , httpRedirect
     , httpRedirect'
-    -- , connectionOpen
+    , withProxiedConnection
     ) where
 
 import Network.HTTP.Types
@@ -77,72 +77,6 @@ httpRaw
      -> IO (Response BodyReader)
 httpRaw = fmap (fmap snd) . httpRaw'
 
-{-
-httpRawWithConnection'
-     :: Request
-     -> Manager
-     -> IO (Request, Connection)
-httpRawWithConnection' req0 m = do
-    let req' = mSetProxy m req0
-    (req, cookie_jar') <- case cookieJar req' of
-        Just cj -> do
-            now <- getCurrentTime
-            return $ insertCookiesIntoRequest req' (evictExpiredCookies cj now) now
-        Nothing -> return (req', Data.Monoid.mempty)
-    (timeout', mconn) <- getConnectionWrapper
-        (responseTimeout' req)
-        (getConn req m)
-
-    -- Originally, we would only test for exceptions when sending the request,
-    -- not on calling @getResponse@. However, some servers seem to close
-    -- connections after accepting the request headers, so we need to check for
-    -- exceptions in both.
-    ex <- try $ do
-        cont <- requestBuilder (dropProxyAuthSecure req) (managedResource mconn)
-
-        -- getResponse timeout' req mconn cont
-        return $ getConnection mconn
-
-    case ex of
-        -- Connection was reused, and might have been closed. Try again
-        Left e | managedReused mconn && mRetryableException m e -> do
-            managedRelease mconn DontReuse
-            httpRawWithConnection' req m
-        -- Not reused, or a non-retry, so this is a real exception
-        Left e -> throwIO e
-        -- Everything went ok, so the connection is good. If any exceptions get
-        -- thrown in the response body, just throw them as normal.
-        Right conn -> case cookieJar req' of
-            Just _ -> do
-                return (req, conn)
-            Nothing -> return (req, conn)
-  where
-    getConnectionWrapper mtimeout f =
-        case mtimeout of
-            Nothing -> fmap ((,) Nothing) f
-            Just timeout' -> do
-                before <- getCurrentTime
-                mres <- timeout timeout' f
-                case mres of
-                    Nothing -> throwHttp ConnectionTimeout
-                    Just res -> do
-                        now <- getCurrentTime
-                        let timeSpentMicro = diffUTCTime now before * 1000000
-                            remainingTime = round $ fromIntegral timeout' - timeSpentMicro
-                        if remainingTime <= 0
-                            then throwHttp ConnectionTimeout
-                            else return (Just remainingTime, res)
-
-    responseTimeout' req =
-        case responseTimeout req of
-            ResponseTimeoutDefault ->
-                case mResponseTimeout m of
-                    ResponseTimeoutDefault -> Just 30000000
-                    ResponseTimeoutNone -> Nothing
-                    ResponseTimeoutMicro u -> Just u
-            ResponseTimeoutNone -> Nothing
-            ResponseTimeoutMicro u -> Just u
--}
 
 -- | Get a 'Response' without any redirect following.
 --
@@ -226,33 +160,6 @@ getModifiedRequestManager manager0 req0 = do
   req <- mModifyRequest manager req0
   return (manager, req)
 
-{-
-connectionOpen :: Request -> Manager -> IO (Managed Connection)
-connectionOpen inputReq manager' = do
-  (manager, req0) <- getModifiedRequestManager manager' inputReq
-
-  wrapExc req0 $ mWrapException manager req0 $ do
-    (req, res) <- go manager (redirectCount req0) req0
-    checkResponse req req res
-    mModifyResponse manager res
-        { responseBody = wrapExc req0 (responseBody res)
-        }
-  where
-    wrapExc :: Request -> IO a -> IO a
-    wrapExc req0 = handle $ throwIO . toHttpException req0
-
-    go :: Manager -> Int -> Request -> IO (Request, Response BodyReader)
-    go manager0 count req' = httpRedirect'
-      count
-      (\req -> do
-        (manager, modReq) <- getModifiedRequestManager manager0 req
-        (req'', conn) <- httpRawWithConnection' modReq manager
-        let mreq = if redirectCount modReq == 0
-              then Nothing
-              else getRedirectedRequest req'' (responseHeaders res) (responseCookieJar res) (statusCode (responseStatus res))
-        return (res, fromMaybe req'' mreq, isJust mreq))
-      req'
-  -}
 
 -- | The most low-level function for initiating an HTTP request.
 --
@@ -366,3 +273,9 @@ httpRedirect' count0 http' req0 = go count0 req0 []
 -- Since 0.1.0
 responseClose :: Response a -> IO ()
 responseClose = runResponseClose . responseClose'
+
+
+withProxiedConnection :: Request -> Manager -> (Managed Connection -> IO a) -> IO a
+withProxiedConnection origReq man action = do
+  mHttpConn <- getConn (mSetProxy man origReq) man
+  action mHttpConn `finally` managedRelease mHttpConn DontReuse
