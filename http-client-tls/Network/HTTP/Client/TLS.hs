@@ -51,8 +51,6 @@ import qualified Data.Text as T
 import Data.Text.Read (decimal)
 import qualified Network.URI as U
 
-import Debug.Trace hiding (traceId)
-
 -- | Create a TLS-enabled 'ManagerSettings' with the given 'NC.TLSSettings' and
 -- 'NC.SockSettings'
 mkManagerSettings :: NC.TLSSettings
@@ -161,12 +159,12 @@ getTlsProxyConnection mcontext tls sock = do
 
 convertConnection :: NC.Connection -> IO Connection
 convertConnection conn = makeConnection
-    (traceId "TlsConnection: Reading:" <$> NC.connectionGetChunk conn)
-    (NC.connectionPut conn . traceId "TlsConnection: Writing:")
+    (NC.connectionGetChunk conn)
+    (NC.connectionPut conn)
     -- Closing an SSL connection gracefully involves writing/reading
     -- on the socket.  But when this is called the socket might be
     -- already closed, and we get a @ResourceVanished@.
-    (traceM "TlsConnection: Closing:" >> NC.connectionClose conn `Control.Exception.catch` \(_ :: IOException) -> return ())
+    (NC.connectionClose conn `Control.Exception.catch` \(_ :: IOException) -> return ())
 
 -- We may decide in the future to just have a global
 -- ConnectionContext and use it directly in tlsManagerSettings, at
@@ -431,9 +429,3 @@ applyDigestAuth user pass req0 man = liftIO $ do
     parseUnquoted bs =
         let (x, y) = S.break (== _comma) bs
          in (x, S.drop 1 y)
-
-traceIdVia :: Show b => (a -> b) -> String -> a -> a
-traceIdVia via prefix x = trace (prefix ++ ": " ++ show (via x)) x
-
-traceId :: Show a => String -> a -> a
-traceId = traceIdVia id

@@ -88,8 +88,6 @@ import           System.Win32.Registry       (hKEY_CURRENT_USER, rEG_DWORD,
 import           System.Win32.Types          (DWORD, HKEY)
 #endif
 
-import           Debug.Trace
-
 type EnvName     = T.Text
 type HostAddress = S8.ByteString
 type UserName    = S8.ByteString
@@ -343,11 +341,10 @@ envHelper name = do
       lookupEnvVar n = lookup (T.unpack n) env A.<|> Map.lookup n lenv
       noProxyDomains = domainSuffixes (lookupEnvVar "no_proxy")
 
-  case lookupEnvVar (traceShowId name) of
+  case lookupEnvVar name of
       Nothing  -> return . const $ Nothing
       Just ""  -> return . const $ Nothing
       Just str -> do
-          traceM $ "lookupEnvVar " ++ show name ++ " => " ++ show str
           let invalid = throwHttp $ InvalidProxyEnvironmentVariable name (T.pack str)
           (p, muserpass) <- maybe invalid return $ do
               let allowedScheme x = x == "http:"
@@ -371,8 +368,7 @@ envHelper name = do
                       _ -> Nothing
 
               Just (Proxy (S8.pack $ U.uriRegName auth) port', extractBasicAuthInfo uri)
-          traceM $ "(p, muserpass) => " ++ show (p, muserpass)
-          return $ traceShowId . \hostRequest ->
+          return $ \hostRequest ->
               if hostRequest `hasDomainSuffixIn` noProxyDomains
               then Nothing
               else Just $ ProxySettings p muserpass

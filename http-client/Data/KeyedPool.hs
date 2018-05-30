@@ -50,8 +50,6 @@ import qualified Data.Foldable as F
 import GHC.Conc (unsafeIOToSTM)
 import System.IO.Unsafe (unsafePerformIO)
 
-import Debug.Trace hiding (traceId)
-
 data KeyedPool key resource = KeyedPool
     { kpCreate :: !(key -> IO resource)
     , kpDestroy :: !(resource -> IO ())
@@ -226,7 +224,6 @@ takeKeyedPool kp key = mask_ $ join $ atomically $ do
         isReleasedVar <- newTVarIO False
 
         let release action = mask_ $ do
-                putStrLn "Releasing"
                 isReleased <- atomically $ swapTVar isReleasedVar True
                 unless isReleased $
                     case action of
