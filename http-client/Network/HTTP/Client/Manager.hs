@@ -36,8 +36,6 @@ import Network.HTTP.Proxy
 import Data.KeyedPool
 import Data.Maybe (isJust)
 
-import           System.Environment (lookupEnv)
-
 -- | A value for the @managerRawConnection@ setting, but also allows you to
 -- modify the underlying @Socket@ to set additional settings. For a motivating
 -- use case, see: <https://github.com/snoyberg/http-client/issues/71>.

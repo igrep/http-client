@@ -77,7 +77,6 @@ httpRaw
      -> IO (Response BodyReader)
 httpRaw = fmap (fmap snd) . httpRaw'
 
-
 -- | Get a 'Response' without any redirect following.
 --
 -- This extended version of 'httpRaw' also returns the potentially modified Request.
@@ -159,7 +158,6 @@ getModifiedRequestManager manager0 req0 = do
   let manager = fromMaybe manager0 (requestManagerOverride req0)
   req <- mModifyRequest manager req0
   return (manager, req)
-
 
 -- | The most low-level function for initiating an HTTP request.
 --
