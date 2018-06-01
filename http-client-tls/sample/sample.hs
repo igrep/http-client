@@ -5,7 +5,7 @@ import           Control.Exception
 import           Control.Monad (forever, unless, void)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
-import           Data.KeyedPool (managedResource)
+import           Data.KeyedPool (managedResource, managedKeepAlive)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -58,16 +58,14 @@ app conn = do
   killThread tid
 
 
--- Managed に囲われた状態の Connection を直接扱う APIを提供する？
--- withProxiedConnection
 withWsStremFromHttpConnection :: Http.Request -> Http.Manager -> (WS.Stream -> IO a) -> IO a
 withWsStremFromHttpConnection req manager action =
-  Http.withProxiedConnection req manager $ \mconn -> do
+  Http.withProxiedConnection req manager $ \conn -> do
     bracket
       ( do
         let read = do
               traceM $ "Stream: BEGAN reading"
-              bs <- Http.connectionRead $ managedResource mconn
+              bs <- Http.connectionRead $ conn
               traceM $ "Stream: FINISHED reading " ++ show bs
               return $
                 if BS.null bs
@@ -76,8 +74,8 @@ withWsStremFromHttpConnection req manager action =
 
             write =
               maybe
-                (Http.connectionClose $ managedResource mconn)
-                (Http.connectionWrite (managedResource mconn) . traceId "Stream: BEGAN writing" . BSL.toStrict)
+                (Http.connectionClose conn)
+                (Http.connectionWrite conn . traceId "Stream: BEGAN writing" . BSL.toStrict)
         WS.makeStream read write
       )
       WS.close
