@@ -2,17 +2,15 @@
 
 import           Control.Concurrent  (forkIO, killThread)
 import           Control.Exception
-import           Control.Monad (forever, unless, void)
+import           Control.Monad (forever, unless)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
-import           Data.KeyedPool (managedResource, managedKeepAlive)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import           Network.HTTP.Client (defaultManagerSettings, newManager, parseRequest, httpLbs)
+import           Network.HTTP.Client (newManager, parseRequest)
 import qualified Network.HTTP.Client.Internal as Http
 import           Network.HTTP.Client.TLS (tlsManagerSettings)
-import           Network.Socket (withSocketsDo)
 import qualified Network.WebSockets as WS
 import qualified Network.WebSockets.Stream as WS
 
@@ -20,19 +18,7 @@ import Debug.Trace hiding (traceId)
 
 
 main :: IO ()
--- main = httpMain
-main = wsMain
-
-
-httpMain :: IO ()
-httpMain = do
-  man <- newManager defaultManagerSettings
-  let req = "http://httpbin.org"
-  void $ httpLbs req man
-
-
-wsMain :: IO ()
-wsMain = do
+main = do
   manager <- newManager tlsManagerSettings
   req <- parseRequest "GET https://echo.websocket.org/"
   withWsStremFromHttpConnection req manager $ \stream ->
