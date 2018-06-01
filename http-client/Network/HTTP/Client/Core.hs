@@ -276,5 +276,5 @@ responseClose = runResponseClose . responseClose'
 withProxiedConnection :: Request -> Manager -> (Connection -> IO a) -> IO a
 withProxiedConnection origReq man action = do
   mHttpConn <- getConn (mSetProxy man origReq) man
-  action (managedResource mHttpConn) <* managedKeepAlive mHttpConn
+  action (managedResource mHttpConn) <* keepAlive mHttpConn
     `finally` managedRelease mHttpConn DontReuse

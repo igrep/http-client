@@ -33,7 +33,7 @@ module Data.KeyedPool
     , managedResource
     , managedReused
     , managedRelease
-    , managedKeepAlive
+    , keepAlive
     , Reuse (..)
     , dummyManaged
     ) where
@@ -321,5 +321,5 @@ ignoreExceptions :: IO () -> IO ()
 ignoreExceptions f = f `catch` \(_ :: SomeException) -> return ()
 
 
-managedKeepAlive :: Managed resource -> IO ()
-managedKeepAlive = readIORef . _managedAlive
+keepAlive :: Managed resource -> IO ()
+keepAlive = readIORef . _managedAlive
