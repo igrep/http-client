@@ -21,7 +21,6 @@ library
   exposed-modules:     Network.HTTP.Client
                        Network.HTTP.Client.MultipartFormData
                        Network.HTTP.Client.Internal
-                       Data.KeyedPool
   other-modules:       Network.HTTP.Client.Body
                        Network.HTTP.Client.Connection
                        Network.HTTP.Client.Cookies
@@ -37,6 +36,7 @@ library
                        Network.PublicSuffixList.Types
                        Network.PublicSuffixList.Serialize
                        Network.PublicSuffixList.DataStructure
+                       Data.KeyedPool
   build-depends:       base              >= 4.6    && < 5
                      , bytestring        >= 0.10
                      , text              >= 0.11
