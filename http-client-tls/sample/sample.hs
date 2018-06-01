@@ -63,25 +63,25 @@ app conn = do
 withWsStremFromHttpConnection :: Http.Request -> Http.Manager -> (WS.Stream -> IO a) -> IO a
 withWsStremFromHttpConnection req manager action =
   Http.withProxiedConnection req manager $ \mconn -> do
-  bracket
-    ( do
-      let read = do
-            traceM $ "Stream: BEGAN reading"
-            bs <- Http.connectionRead $ managedResource mconn
-            traceM $ "Stream: FINISHED reading " ++ show bs
-            return $
-              if BS.null bs
-                then Nothing
-                else Just bs
+    bracket
+      ( do
+        let read = do
+              traceM $ "Stream: BEGAN reading"
+              bs <- Http.connectionRead $ managedResource mconn
+              traceM $ "Stream: FINISHED reading " ++ show bs
+              return $
+                if BS.null bs
+                  then Nothing
+                  else Just bs
 
-          write =
-            maybe
-              (Http.connectionClose $ managedResource mconn)
-              (Http.connectionWrite (managedResource mconn) . traceId "Stream: BEGAN writing" . BSL.toStrict)
-      WS.makeStream read write
-    )
-    WS.close
-    action
+            write =
+              maybe
+                (Http.connectionClose $ managedResource mconn)
+                (Http.connectionWrite (managedResource mconn) . traceId "Stream: BEGAN writing" . BSL.toStrict)
+        WS.makeStream read write
+      )
+      WS.close
+      action
 
 traceIdVia :: Show b => (a -> b) -> String -> a -> a
 traceIdVia via prefix x = trace (prefix ++ ": " ++ show (via x)) x
