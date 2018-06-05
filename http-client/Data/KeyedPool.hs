@@ -320,6 +320,6 @@ dummyManaged resource = Managed
 ignoreExceptions :: IO () -> IO ()
 ignoreExceptions f = f `catch` \(_ :: SomeException) -> return ()
 
-
+-- | Prevent the managed resource from getting released before you want to use.
 keepAlive :: Managed resource -> IO ()
 keepAlive = readIORef . _managedAlive
